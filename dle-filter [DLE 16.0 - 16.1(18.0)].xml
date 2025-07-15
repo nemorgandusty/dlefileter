@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<dleplugin>
+	<name>DLE Filter</name>
+	<description>Module de filtrage des articles [ https://lazydev.pro ]</description>
+	<icon></icon>
+	<version>2.6.0</version>
+	<dleversion>16.0</dleversion>
+	<versioncompare>greater</versioncompare>
+	<upgradeurl></upgradeurl>
+	<filedelete>0</filedelete>
+	<needplugin></needplugin>
+	<mnotice>0</mnotice>
+	<mysqlinstall><![CDATA[INSERT INTO `{prefix}_admin_sections` (`name`, `title`, `descr`, `icon`, `allow_groups`) VALUES ('dle_filter', 'DLE Filter', 'Настройка модуля фильтра новостей', '', '1');
+CREATE TABLE IF NOT EXISTS `{prefix}_dle_filter_statistics` (
+	`idFilter` int(10) NOT NULL AUTO_INCREMENT,
+	`dateFilter` datetime NOT NULL DEFAULT '2019-01-01 00:00:00',
+	`foundNews` tinyint(1) NOT NULL DEFAULT 0,
+	`ip` varchar(40) NOT NULL,
+	`queryNumber` smallint(2) NOT NULL,
+	`nick` varchar(40) NOT NULL,
+	`memoryUsage` double NOT NULL,
+	`mysqlTime` double NOT NULL,
+	`templateTime` double NOT NULL,
+	`statistics` mediumtext NOT NULL,
+  	`sqlQuery` text NOT NULL,
+  	`allTime` double NOT NULL,
+    PRIMARY KEY (`idFilter`)
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET={charset} COMMENT='DLE Filter by lazydev.pro';
+CREATE TABLE IF NOT EXISTS `{prefix}_dle_filter_news` (
+	`filterId` int(11) NOT NULL AUTO_INCREMENT,
+	`newsId` int(11) NOT NULL,
+	UNIQUE KEY `newsId` (`newsId`),
+	KEY `filterId` (`filterId`)
+) ENGINE=InnoDB DEFAULT CHARSET={charset};
+CREATE TABLE IF NOT EXISTS `{prefix}_dle_filter_news_temp` (
+    `tempId` int(11) NOT NULL AUTO_INCREMENT,
+    `newsId` int(11) NOT NULL,
+    `xfieldNew` mediumtext NOT NULL,
+    `allow_br` tinyint(1) NOT NULL DEFAULT '1',
+    UNIQUE KEY `tempId` (`tempId`)
+) ENGINE=InnoDB DEFAULT CHARSET={charset};
+CREATE TABLE IF NOT EXISTS `{prefix}_dle_filter_pages` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `page_url` varchar(190) NOT NULL,
+  `filter_url` text NOT NULL,
+  `sitemap` tinyint(1) NOT NULL DEFAULT 0,
+  `redirect` tinyint(1) NOT NULL DEFAULT 0,
+  `seo_title` varchar(255) NOT NULL,
+  `seo_text` mediumtext NOT NULL,
+  `meta_title` varchar(255) NOT NULL,
+  `meta_descr` varchar(300) NOT NULL,
+  `meta_key` text NOT NULL,
+  `speedbar` varchar(300) NOT NULL,
+  `og_title` varchar(255) NOT NULL,
+  `og_descr` varchar(300) NOT NULL,
+  `og_image` text NOT NULL,
+  `date` DATETIME NOT NULL DEFAULT '2020-11-01 00:00:00',
+  `dateEdit` VARCHAR(120) NOT NULL,
+  `approve` TINYINT(1) NOT NULL DEFAULT '1',
+  `max_news` INT(9) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET={charset} COMMENT='DLE Filter by lazydev.pro';
+CREATE TABLE IF NOT EXISTS `{prefix}_dle_filter_files` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `filterId` int(11) NOT NULL,
+  `name` text NOT NULL,
+  `onserver` varchar(250) NOT NULL,
+  `author` varchar(40) NOT NULL,
+  `date` datetime NOT NULL,
+  `size` bigint(20) NOT NULL,
+  `type` tinyint(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET={charset} COMMENT='DLE Filter by lazydev.pro';]]></mysqlinstall>
+	<mysqlupgrade><![CDATA[]]></mysqlupgrade>
+	<mysqlenable><![CDATA[]]></mysqlenable>
+	<mysqldisable><![CDATA[]]></mysqldisable>
+	<mysqldelete><![CDATA[DELETE FROM `{prefix}_admin_sections` WHERE `name`='dle_filter';
+DROP TABLE IF EXISTS `{prefix}_dle_filter_statistics`;
+DROP TABLE IF EXISTS `{prefix}_dle_filter_news`;
+DROP TABLE IF EXISTS `{prefix}_dle_filter_pages`;
+DROP TABLE IF EXISTS `{prefix}_dle_filter_news_temp`;
+DROP TRIGGER IF EXISTS filter_news_delete;
+DROP TRIGGER IF EXISTS filter_news_update;
+DROP TRIGGER IF EXISTS filter_news_insert;]]></mysqldelete>
+	<phpinstall><![CDATA[]]></phpinstall>
+	<phpupgrade><![CDATA[]]></phpupgrade>
+	<phpenable><![CDATA[]]></phpenable>
+	<phpdisable><![CDATA[]]></phpdisable>
+	<phpdelete><![CDATA[]]></phpdelete>
+	<notice><![CDATA[]]></notice>
+	<file name="engine/engine.php">
+		<operation action="after">
+			<searchcode><![CDATA[switch ( $do ) {]]></searchcode>
+			<replacecode><![CDATA[case 'dle_filter':
+	include ENGINE_DIR . '/lazydev/dle_filter/index.php';
+break;]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+		<operation action="before">
+			<searchcode><![CDATA[switch ( $do ) {]]></searchcode>
+			<replacecode><![CDATA[include ENGINE_DIR . '/lazydev/dle_filter/lib/dle_filter.router.php';]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+	</file>
+	<file name="engine/modules/main.php">
+		<operation action="before">
+			<searchcode><![CDATA[echo $tpl->result['main'];]]></searchcode>
+			<replacecode><![CDATA[include ENGINE_DIR . '/lazydev/dle_filter/lib/dle_filter.lib.php';]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+		<operation action="after">
+			<searchcode><![CDATA[$ajax .= <<<HTML
+
+//-->
+</script>
+HTML;]]></searchcode>
+			<replacecode><![CDATA[$filterUrl = 0;
+if (!$vars['ajax']) {
+	$checkPageFilter = false;
+	if (is_array($dleFilterPage)) {
+		$checkPageFilter = array_filter($dleFilterPage, function ($a) use ($cleanUrlFilter) {
+			return $a['page'] == $cleanUrlFilter;
+		});
+	}
+    if ($checkPageFilter) {
+        $checkPageFilter = array_values($checkPageFilter);
+        $filterUrl = "'/" . $checkPageFilter[0]['page'] . "/'";
+    }
+}
+if (strpos($js_array, 'engine/classes/html5player/hls.js') !== false) {
+	$dleFilterJSLoad['hls'] = true;
+}
+if (strpos($js_array, 'engine/classes/html5player/plyr.js') !== false) {
+	$dleFilterJSLoad['plyr_player'] = true;
+}
+$dleFilterJSData = json_encode($dleFilterJSLoad);
+$dleIdVer = $config['version_id'] >= 14.3 ? 1 : 0;
+$ajax .= <<<HTML
+<script>
+let urlFilter = {$filterUrl};
+let dleFilterJSData = {$dleFilterJSData};
+let dleFilterId = $dleIdVer;
+</script>
+HTML;
+if ($dle_module == 'dle_filter' && $tpl->result['speedbar']) {
+    $metatags .= <<<HTML
+
+<script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "BreadcrumbList",
+                "@context":"https://schema.org/",
+                "itemListElement": [
+                    {
+                        "@type": "ListItem",
+                        "position": 1,
+                        "item": 
+                        {
+                            "@id": "{$dleFilterSiteUrl}",
+                            "name": "{$config['short_title']}"
+                        }
+                    },
+                    {
+                        "@type": "ListItem",
+                        "position": 2,
+                        "item":
+                        {
+                            "@id": "{$url_page}/",
+                            "name": "{$dleFilterSpeedbarData}"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+</script>
+HTML;
+}]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+		<operation action="before">
+			<searchcode><![CDATA[if (strpos ( $tpl->result['content'], "<pre" ) !== false]]></searchcode>
+			<replacecode><![CDATA[$dleFilterJSLoad = [];]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+		<operation action="after">
+			<searchcode><![CDATA[$js_array[] = "engine/classes/highlight/highlight.code.js";]]></searchcode>
+			<replacecode><![CDATA[$dleFilterJSLoad['pre'] = true;]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+		<operation action="after">
+			<searchcode><![CDATA[$js_array[] = "engine/classes/fancybox/fancybox.js";]]></searchcode>
+			<replacecode><![CDATA[$dleFilterJSLoad['highslide'] = true;]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+		<operation action="after">
+			<searchcode><![CDATA[$js_array[] = "engine/classes/html5player/player.js";]]></searchcode>
+			<replacecode><![CDATA[$dleFilterJSLoad['dle_player'] = true;]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+		<operation action="before">
+			<searchcode><![CDATA[$tpl->set ( '{content}',]]></searchcode>
+			<replacecode><![CDATA[if ($config['version_id'] >= 15) {
+	$tpl->result['content'] = "<div id=\"dle-content\">" . $tpl->result['content'] . "</div>";
+}]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+	</file>
+	<file name="engine/modules/functions.php">
+		<operation action="before">
+			<searchcode><![CDATA[if (isset($_GET['do']) AND $_GET['do'] == "tags") {]]></searchcode>
+			<replacecode><![CDATA[if (isset($_GET['do']) && $_GET['do'] == 'dle_filter') {
+	$f = html_entity_decode(urldecode($_GET['filter_data']), ENT_QUOTES, 'ISO-8859-1');
+
+	$count1 = substr_count($f, "'");
+	$count2 = substr_count($url, "'");
+
+	if ($count1 == $count2 && (strpos($url, '<') === false) && (strpos($url, '>') === false) && (strpos($url, '.php') === false)) {
+		return;
+	}
+}]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+	</file>
+	<file name="engine/modules/show.short.php">
+		<operation action="before">
+			<searchcode><![CDATA[?>]]></searchcode>
+			<replacecode><![CDATA[if ((float)$config['version_id'] >= 14 && $tpl->result['navigation']) {
+	$tpl->result['navigation'] = '<!--ENGINE_NAVIGATION-->' . $tpl->result['navigation'] . '<!--/ENGINE_NAVIGATION-->';
+} elseif ((float)$config['version_id'] >= 14 && !$tpl->result['navigation']) {
+	$tpl->result['navigation'] = '<!--ENGINE_NAVIGATION--><!--/ENGINE_NAVIGATION-->';
+}]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+	</file>
+	<file name="engine/classes/google.class.php">
+		<operation action="after">
+			<searchcode><![CDATA[$this->generate_news();]]></searchcode>
+			<replacecode><![CDATA[include ENGINE_DIR . '/lazydev/dle_filter/lib/dle_filter.xml.php';]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+	</file>
+	<file name="engine/inc/xfields.php">
+		<operation action="before">
+			<searchcode><![CDATA[unset($xfields[$xfieldsindex]);]]></searchcode>
+			<replacecode><![CDATA[$check = $db->super_query("SELECT COLUMN_NAME FROM information_schema.columns WHERE table_schema = '" . DBNAME . "' AND table_name = '" . PREFIX . "_dle_filter_news' AND column_name = 'xf_{$xfields[$xfieldsindex][0]}'");
+if ($check['COLUMN_NAME']) {
+	$db->query("ALTER TABLE " . PREFIX . "_dle_filter_news DROP COLUMN `xf_{$xfields[$xfieldsindex][0]}`");
+}]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+	</file>
+	<file name="engine/modules/cron.php">
+		<operation action="after">
+			<searchcode><![CDATA[if( $cron == 2 ) {]]></searchcode>
+			<replacecode><![CDATA[$dleFilterConfig = include ENGINE_DIR . '/lazydev/dle_filter/data/config.php';
+if ($dleFilterConfig['clear_statistics'] > 0) {
+  	$statDay = intval($dleFilterConfig['clear_statistics']);
+  	$andDelete = "AND DATE(dateFilter) < DATE_SUB(NOW(), INTERVAL {$statDay} DAY)";
+  	$statDay += 1;
+
+  	$db->query("DELETE FROM " . PREFIX . "_dle_filter_statistics WHERE DATE(dateFilter) > DATE_SUB(NOW(), INTERVAL {$statDay} DAY) {$andDelete}");
+}]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+	</file>
+</dleplugin>
